@@ -15,6 +15,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+import dougalien_brand as brand
+
 import compare
 import finder
 import gallery
@@ -34,7 +36,8 @@ EXAMPLES = ["Charles River", "a flashy urban creek near Boston", "Cedar River in
 VIEWS = ["Last 7 days", "Last 30 days", "Last year", "Full record"]
 EVENT_VIEW = "Gallery window"
 
-st.set_page_config(page_title="River Explorer", page_icon="🌊", layout="wide")
+st.set_page_config(page_title="River Explorer", page_icon=brand.page_icon("🌊"), layout="wide")
+brand.apply_branding()
 
 
 # ---------------------------------------------------------------------------------------------------
