@@ -2,8 +2,9 @@
 
 Colors come from the Dougalien Systems logo (sand, slate, rust) and match
 dougalien.com. The base palette lives in .streamlit/config.toml; this module
-adds the logo, a strata stripe under the header and a few light CSS touches.
-It only changes appearance, never app behavior.
+adds the logo, a strata stripe under the header and a few light CSS touches,
+and darkens the light gray Streamlit uses for captions, widget labels and
+chart text. It only changes appearance, never app behavior.
 
 Usage, right after st.set_page_config(...):
 
@@ -25,6 +26,8 @@ SHEET = "#FFFFFF"
 INK = "#1B1E20"
 MUTED = "#586770"
 RULE = "#D6DBDA"
+CAPTION = "#2F3A40"
+AXIS_LINE = "#586770"
 SLATE = "#3E5C6B"
 RUST = "#B4532A"
 SAND = "#D6B27C"
@@ -71,7 +74,12 @@ _CSS = f"""
 }}
 .stTabs [data-baseweb="tab-list"] {{ border-bottom: 1px solid {RULE}; }}
 .stTabs [aria-selected="true"] {{ color: {SLATE}; }}
-[data-testid="stCaptionContainer"] {{ color: {MUTED}; }}
+/* Captions, widget labels and help text: dark instead of Streamlit's faded gray */
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p {{ color: {CAPTION} !important; opacity: 1 !important; }}
+[data-testid="stWidgetLabel"] p {{ color: {INK} !important; }}
+[data-testid="stMetricLabel"] p {{ color: {INK} !important; }}
+.stApp small {{ color: {CAPTION}; }}
 
 /* Buttons: slate fill for primary (from the theme), rust edge on hover for the rest */
 .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {{
@@ -100,8 +108,90 @@ def _logo():
         st.logo(str(LOGO), link=SITE_URL)
 
 
+def _dark_plotly(fig):
+    """Dark axis, legend and title text on a Plotly figure, where the app hasn't set a color itself."""
+    try:
+        if fig.layout.font.color is None:
+            fig.layout.font.color = INK
+        fig.for_each_xaxis(_dark_axis)
+        fig.for_each_yaxis(_dark_axis)
+        layout = fig.layout
+        if layout.legend.font.color is None:
+            layout.legend.font.color = INK
+        if layout.title.font.color is None:
+            layout.title.font.color = INK
+        for ann in layout.annotations or ():
+            if ann.font.color is None:
+                ann.font.color = INK
+    except Exception:  # never let styling break a chart
+        pass
+    return fig
+
+
+def _dark_axis(axis):
+    if axis.color is not None:  # the app colored this axis on purpose (e.g. to match a series)
+        return
+    if axis.tickfont.color is None:
+        axis.tickfont.color = INK
+    if axis.title.font.color is None:
+        axis.title.font.color = INK
+    if axis.linecolor is None:
+        axis.linecolor = AXIS_LINE
+
+
+def _dark_altair(chart):
+    """Dark axis, legend and header text on an Altair chart."""
+    try:
+        return (
+            chart.configure_axis(labelColor=INK, titleColor=INK, labelFontSize=12, titleFontSize=13,
+                                 domainColor=AXIS_LINE, tickColor=AXIS_LINE)
+            .configure_legend(labelColor=INK, titleColor=INK, labelFontSize=12, titleFontSize=13)
+            .configure_header(labelColor=INK, titleColor=INK)
+            .configure_title(color=INK)
+        )
+    except Exception:  # layered/faceted charts that can't take a config: leave as is
+        return chart
+
+
+def _patch_charts():
+    """Route st.plotly_chart and st.altair_chart (also on columns and containers) through the dark styling."""
+    from streamlit.delta_generator import DeltaGenerator
+
+    if getattr(DeltaGenerator, "_dougalien_dark", False):
+        return
+
+    plotly_chart, altair_chart = DeltaGenerator.plotly_chart, DeltaGenerator.altair_chart
+
+    def dark_plotly_chart(self, figure_or_data, *args, **kwargs):
+        if hasattr(figure_or_data, "update_layout"):
+            figure_or_data = _dark_plotly(figure_or_data)
+        return plotly_chart(self, figure_or_data, *args, **kwargs)
+
+    def dark_altair_chart(self, altair_chart_obj, *args, **kwargs):
+        return altair_chart(self, _dark_altair(altair_chart_obj), *args, **kwargs)
+
+    DeltaGenerator.plotly_chart = dark_plotly_chart
+    DeltaGenerator.altair_chart = dark_altair_chart
+    DeltaGenerator._dougalien_dark = True
+
+
+def _bind_charts():
+    # st.plotly_chart is bound to the main area when Streamlit is imported, so rebind it to the patched methods
+    from streamlit.delta_generator import DeltaGenerator
+
+    main = getattr(st.plotly_chart, "__self__", None)
+    if main is not None:
+        st.plotly_chart = DeltaGenerator.plotly_chart.__get__(main)
+        st.altair_chart = DeltaGenerator.altair_chart.__get__(main)
+
+
 def apply_branding():
     """Add the Dougalien Systems logo and brand styling to the current page."""
+    try:
+        _patch_charts()
+        _bind_charts()
+    except Exception:  # older or newer Streamlit internals: skip the chart styling
+        pass
     _logo()
     if hasattr(st, "html"):
         st.html(_CSS)

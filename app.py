@@ -745,7 +745,7 @@ def conductance_window(site_no: str, win: dict) -> None:
     fig.update_layout(height=430, margin=dict(l=10, r=10, t=10, b=10), hovermode="x unified", legend=dict(orientation="h", x=0, y=1.12),
                       xaxis_title="Local time at the gage" if win["fine"] else "Date",
                       yaxis=dict(title=f"Specific conductance ({unit} at 25 °C)", color=ORANGE),
-                      yaxis2=dict(title="Discharge (cfs)", overlaying="y", side="right", showgrid=False, color="#777777"))
+                      yaxis2=dict(title="Discharge (cfs)", overlaying="y", side="right", showgrid=False, color="#586770"))
     st.plotly_chart(fig, width="stretch", config={"displaylogo": False}, key="sc_window_chart")
     st.caption("A storm usually dilutes conductance as rain water arrives; a winter melt or the first flush after salting can "
                "push it up instead. Drag across the hydrograph above to look at one event.")
