@@ -92,9 +92,39 @@ _CSS = f"""
   color: {RUST};
 }}
 
+/* Logo links home to dougalien.com: show that it is a link on hover and keyboard focus */
+[data-testid="stLogoLink"] {{ border-radius: 4px; }}
+[data-testid="stLogoLink"]:hover img {{ opacity: 0.8; }}
+[data-testid="stLogoLink"]:focus-visible {{ outline: 3px solid {SLATE}; outline-offset: 3px; }}
+/* The script that labels the logo link takes no space on the page */
+[data-testid="stElementContainer"]:has(> [data-testid="stHtml"] > script:only-child) {{ display: none; }}
+
 /* Quotes pick up the rust accent */
 .stApp blockquote {{ border-left: 3px solid {RUST}; }}
 </style>
+"""
+
+
+# Streamlit names the logo link only "Logo"; give it a real name for screen readers and a hover tooltip
+_HOME_LABEL = "Dougalien Systems home page (opens in a new tab)"
+_HOME_JS = f"""
+<script>
+(function () {{
+  if (window.__dougalienHome) return;
+  window.__dougalienHome = true;
+  function label() {{
+    document.querySelectorAll('a[data-testid="stLogoLink"]').forEach(function (a) {{
+      if (a.getAttribute("aria-label") === "{_HOME_LABEL}") return;
+      a.setAttribute("aria-label", "{_HOME_LABEL}");
+      a.setAttribute("title", "Visit dougalien.com");
+      var img = a.querySelector("img");
+      if (img) img.setAttribute("alt", "Dougalien Systems");
+    }});
+  }}
+  label();
+  new MutationObserver(label).observe(document.body, {{ childList: true, subtree: true }});
+}})();
+</script>
 """
 
 
@@ -195,6 +225,10 @@ def apply_branding():
     _logo()
     if hasattr(st, "html"):
         st.html(_CSS)
+        try:
+            st.html(_HOME_JS, unsafe_allow_javascript=True)
+        except TypeError:  # Streamlit without script support in st.html: the logo still links home
+            pass
     else:
         st.markdown(_CSS, unsafe_allow_html=True)
 
